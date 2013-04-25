@@ -74,10 +74,12 @@ class Client(object):
     @staticmethod
     def recv_login_request(*args, **kwds):
         print('Connected to server.')
+        sys.stdout.flush()
 
     @staticmethod
     def recv_chat_message(message):
-        print(message)
+        print(message.encode('utf8'))
+        sys.stdout.flush()
 
     @staticmethod
     def recv_player_position_and_look(**kwds):
@@ -92,6 +94,7 @@ class Client(object):
     @staticmethod
     def recv_client_disconnect(reason):
         print('Disconnected from server: %s' % reason)
+        sys.stdout.flush()
         sys.exit()    
 
 
@@ -134,7 +137,7 @@ def run_read_stdin():
             while len(msg) > 100:
                 connection.sender.send_chat_message(msg[:97] + '...')
                 msg = '...' + msg[97:]
-            connection.sender.send_chat_message(msg)
+            if msg: connection.sender.send_chat_message(msg)
 read_stdin = threading.Thread(target=run_read_stdin, name='read_stdin')
 read_stdin.daemon = True
 read_stdin.start()
@@ -153,3 +156,4 @@ try:
 except KeyboardInterrupt:
     connection.disconnect()
     print('Disconnected from server.')
+    sys.stdout.flush()
