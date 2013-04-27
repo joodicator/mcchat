@@ -41,7 +41,7 @@ auth_server = sys.argv[4] if len(sys.argv) > 4 else None
 
 global_lock = threading.Lock()
 position_and_look = None
-#health = None
+players = set()
 
 def with_global_lock(func):
     def decorated(*args, **kwds):
@@ -53,24 +53,6 @@ NetworkHelper.respond00 = with_global_lock(NetworkHelper.respond00)
 
 
 class Client(object):
-
-#    @staticmethod
-#    def got_event(name, *args, **kwds):
-#        event = connection.eventmanager[name]
-#        for alias, aevent in connection.eventmanager.aliases.iteritems():
-#            if aevent() is event: name = alias
-#        if name.startswith('sent_'):
-#            if name not in ('sent_client_statuses',
-#                            'sent_respawn'): return
-#        elif name.startswith('recv_'):
-#            if name not in ('recv_player',
-#                            'recv_player_position',
-#                            'recv_player_look',
-#                            'recv_player_position_and_look',
-#                            'recv_update_health',
-#                            'recv_respawn'): return
-#        print('@ %s %s %s' % (name, args, kwds), file=sys.stderr)
-
     @staticmethod
     def recv_login_request(*args, **kwds):
         print('Connected to server.')
@@ -86,17 +68,19 @@ class Client(object):
         global position_and_look
         with global_lock: position_and_look = kwds
 
-#    @staticmethod
-#    def recv_update_health(**kwds):
-#        global health
-#        with global_lock: health = kwds
-
     @staticmethod
     def recv_client_disconnect(reason):
         print('Disconnected from server: %s' % reason)
         sys.stdout.flush()
         sys.exit()    
 
+    @staticmethod
+    def recv_player_list_item(player_name, online, ping):
+        with global_lock:
+            if online:
+                players.add(player_name)
+            else:
+                players.remove(player_name)
 
 def run_send_position():
     while True:
@@ -109,19 +93,12 @@ send_position.daemon = True
 send_position.start()
 
 
-#def run_respawn():
-#    while True:
-#        time.sleep(1)
-#        with global_lock:
-#            if health is None: continue
-#            if health['health'] > 1: continue
-#        time.sleep(1)
-#        with global_lock:
-#            connection.sender.send_client_status(1)
-#respawn = threading.Thread(target=run_respawn, name='respawn')
-#respawn.daemon = True
-#respawn.start()
-
+def list_players():
+    if players:
+        print('Players online: %s.' % ', '.join(players))
+    else:
+        print('No players online.')
+    sys.stdout.flush()
 
 def run_command(cmd):
     try: exec cmd
