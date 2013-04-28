@@ -44,6 +44,7 @@ auth_server = sys.argv[4] if len(sys.argv) > 4 else None
 
 global_lock = threading.Lock()
 position_and_look = None
+connection = None
 players = set()
 
 def with_global_lock(func):
@@ -107,6 +108,14 @@ def run_command(cmd):
     try: exec cmd
     except Exception: traceback.print_exc()
 
+session = MC2Session(auth_server) if auth_server else Session()
+session.connect(username, password)
+connection = Connection(session, EventManager, Receiver, Sender)
+connection.name = 'connection'
+connection.eventmanager.apply(Client)
+connection.connect(host, port)
+
+
 def run_read_stdin():
     while True:
         msg = raw_input().decode('utf8')
@@ -122,13 +131,6 @@ read_stdin = threading.Thread(target=run_read_stdin, name='read_stdin')
 read_stdin.daemon = True
 read_stdin.start()
 
-
-session = MC2Session(auth_server) if auth_server else Session()
-session.connect(username, password)
-connection = Connection(session, EventManager, Receiver, Sender)
-connection.name = 'connection'
-connection.eventmanager.apply(Client)
-connection.connect(host, port)
 
 try:
     while connection.is_alive():
