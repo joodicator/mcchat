@@ -36,7 +36,10 @@ if len(sys.argv) not in (4, 5):
 
 address, username, password = sys.argv[1:4]
 address = address.rsplit(':', 1)
-host, port = address if len(address) == 2 else (address[0], DEFAULT_PORT)
+if len(address) == 2:
+    host, port = address[0], int(address[1])
+else:
+    host, port = address[0], DEFAULT_PORT
 auth_server = sys.argv[4] if len(sys.argv) > 4 else None
 
 global_lock = threading.Lock()
