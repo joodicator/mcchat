@@ -46,6 +46,7 @@ global_lock = threading.Lock()
 position_and_look = None
 connection = None
 players = set()
+connected = False
 
 def with_global_lock(func):
     def decorated(*args, **kwds):
@@ -59,6 +60,8 @@ NetworkHelper.respond00 = with_global_lock(NetworkHelper.respond00)
 class Client(object):
     @staticmethod
     def recv_login_request(*args, **kwds):
+        with global_lock:
+            connected = True
         print('Connected to server.')
         sys.stdout.flush()
 
@@ -137,5 +140,7 @@ try:
         connection.join(0.1)
 except KeyboardInterrupt:
     connection.disconnect()
-    print('Disconnected from server.')
-    sys.stdout.flush()
+    with global_lock:
+        if connected:
+            print('Disconnected from server.')
+            sys.stdout.flush()
