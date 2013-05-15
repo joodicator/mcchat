@@ -27,6 +27,8 @@ from McClient import Utils
 
 from MC2Session import MC2Session
 
+Sender.protocol_version = 61
+
 DEFAULT_PORT = 25565
 
 if len(sys.argv) not in (4, 5):
@@ -60,6 +62,7 @@ NetworkHelper.respond00 = with_global_lock(NetworkHelper.respond00)
 class Client(object):
     @staticmethod
     def recv_login_request(*args, **kwds):
+        global connected
         with global_lock:
             connected = True
         print('Connected to server.')
@@ -77,9 +80,11 @@ class Client(object):
 
     @staticmethod
     def recv_client_disconnect(reason):
-        print('Disconnected from server: %s' % reason)
-        sys.stdout.flush()
-        sys.exit()    
+        with global_lock:
+            if connected:
+                print('Disconnected from server: %s' % reason)
+                sys.stdout.flush()
+                sys.exit()    
 
     @staticmethod
     def recv_player_list_item(player_name, online, ping):
