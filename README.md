@@ -11,3 +11,4 @@ Dependencies
 - https://github.com/dkkline/McClientLib
 - https://pypi.python.org/pypi/EventManager (required by McClientLib)
 - https://pypi.python.org/pypi/PyNBT (required by McClientLib)
+- https://pypi.python.org/pypi/pycrypto (required by McClientLib)
