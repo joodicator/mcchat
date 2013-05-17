@@ -115,6 +115,7 @@ def list_players():
 def run_command(cmd):
     try: exec cmd
     except Exception: traceback.print_exc()
+    for f in sys.stdout, sys.stderr: f.flush()
 
 session = MC2Session(auth_server) if auth_server else Session()
 session.connect(username, password)
@@ -145,7 +146,8 @@ try:
         connection.join(0.1)
 except KeyboardInterrupt:
     connection.disconnect()
-    with global_lock:
-        if connected:
-            print('Disconnected from server.')
-            sys.stdout.flush()
+
+with global_lock:
+    if connected:
+        print('Disconnected from server.')
+        sys.stdout.flush()
