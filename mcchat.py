@@ -82,6 +82,7 @@ class Client(object):
     def recv_client_disconnect(reason):
         with global_lock:
             if connected:
+                connected = False
                 print('Disconnected from server: %s' % reason)
                 sys.stdout.flush()
                 sys.exit()    
