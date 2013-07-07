@@ -21,20 +21,11 @@ class MC2Session(BaseSession):
         opener = urllib2.build_opener()
         try:
             response = opener.open(req, None, 10).read()
-        except urllib2.URLError:
-            raise SessionError("Unable to connect to login server.")
-
-        if response.lower() == "bad login":
-            raise SessionBadLogin("Wrong username/password combination.")
-
-        if response.lower() in ("old version", "bad response"):
-            raise SessionVersionError("Client version deprecated.")
-
-        if response.lower() == "account migrated, use e-mail":
-            raise SessionBadLogin("Account migrated, use e-mail")
+        except urllib2.URLError as e:
+            raise SessionError('Authentication failed: %s' % e)
 
         if ':' not in response:
-            raise SessionError(response)
+            raise SessionError('Authentication failed: %s' % response)
         
         response = response.split(":")
 
@@ -52,7 +43,6 @@ class MC2Session(BaseSession):
         response = urllib2.urlopen(url).read()
 
         if response != "OK":
-            raise SessionError("Authentication failed; response was: %s"
-                % response)
+            raise SessionError("Authentication failed: %s" % response)
 
         return True
