@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.7
 
 # Usage: mcchat.py HOST[:PORT] USERNAME PASSWORD [AUTH_SERVER]
 #
@@ -80,6 +80,7 @@ class Client(object):
 
     @staticmethod
     def recv_client_disconnect(reason):
+        global connected
         with global_lock:
             if connected:
                 connected = False
