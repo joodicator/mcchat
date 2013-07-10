@@ -139,7 +139,7 @@ def run_query():
         for key in pending: fprint('!query pending %s' % key)
         global_lock.release()
         try:
-            status = MinecraftQuery(host, port).get_rules()
+            status = MinecraftQuery(host, port, timeout=1, retries=5).get_rules()
             global_lock.acquire()
             for key in pending:
                 if key in status:
