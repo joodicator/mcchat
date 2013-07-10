@@ -61,6 +61,9 @@ NetworkHelper.respondFD = with_global_lock(NetworkHelper.respondFD)
 NetworkHelper.respondFC = with_global_lock(NetworkHelper.respondFC)
 NetworkHelper.respond00 = with_global_lock(NetworkHelper.respond00)
 
+def fprint(*args, **kwds):
+    print(*args, **kwds)
+    kwds.get('file', sys.stdout).flush()
 
 class Client(object):
     @staticmethod
@@ -124,18 +127,16 @@ def run_command(cmd):
 
 query_pending = set()
 def query(key):
-    global query_map_name_called
     query_pending.add(str(key))
     global_cond.notifyAll()        
 
 @with_global_lock
 def run_query():
     while True:
-        global_cond.wait()
-        if not query_pending: continue
+        while not query_pending: global_cond.wait()
         pending = query_pending.copy()
         query_pending.clear()
-        for key in pending: print('!query pending %s' % key)
+        for key in pending: fprint('!query pending %s' % key)
         global_lock.release()
         try:
             status = MinecraftQuery(host, port).get_rules()
@@ -144,12 +145,12 @@ def run_query():
                 if key in status:
                     val = status[key]
                     if type(val) is list: val = ' '.join(val)
-                    print('!query result %s %s' % (key, val))
+                    fprint('!query success %s %s' % (key, val))
                 else:
-                    print('!query failure %s no such key' % key)
+                    fprint('!query failure %s no such key' % key)
         except socket.timeout as e:
             global_lock.acquire()
-            for key in pending: print('!query failure %s %s' % (key, str(e)))
+            for key in pending: fprint('!query failure %s %s' % (key, str(e)))
 query_server = threading.Thread(target=run_query, name='query_server')
 query_server.daemon = True
 query_server.start()
