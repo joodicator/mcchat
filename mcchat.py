@@ -16,6 +16,7 @@ import time
 import os.path
 import threading
 import traceback
+import socket
 
 from McClient.networking.NetworkHelper import NetworkHelper
 from McClient.networking.Connection import Connection
@@ -25,6 +26,7 @@ from McClient.networking.Sender import Sender
 from McClient.Events import EventManager
 from McClient import Utils
 
+from minecraft_query import MinecraftQuery
 from MC2Session import MC2Session
 
 Sender.protocol_version = 61
@@ -120,31 +122,37 @@ def run_command(cmd):
     except Exception: traceback.print_exc()
     for f in sys.stdout, sys.stderr: f.flush()
 
-def query_map_name():
+query_pending = set()
+def query(key):
     global query_map_name_called
-    query_map_name_called = True
+    query_pending.add(str(key))
     global_cond.notifyAll()        
-query_map_name_called = False
 
 @with_global_lock
 def run_query():
-    global query_map_name_called
-    from minecraft_query import MinecraftQuery
-    import socket
     while True:
         global_cond.wait()
-        if not query_map_name_called: continue
-        query_map_name_called = False
+        if not query_pending: continue
+        pending = query_pending.copy()
+        query_pending.clear()
+        print('!query pending')
         global_lock.release()
         try:
-            status = MinecraftQuery(host, port).get_status()
-            print('!map_name %s' % repr(status))
-        except socket.timeout:
-            print('!failure query_map_name timeout')
-        global_lock.acquire()
-query = threading.Thread(target=run_query, name='query')
-query.daemon = True
-query.start()
+            status = MinecraftQuery(host, port).get_rules()
+            global_lock.acquire()
+            for key in pending:
+                if key in status:
+                    val = status[key]
+                    if type(val) is list: val = ' '.join(val)
+                    print('!query result %s %s' % (key, val))
+                else:
+                    print('!query missing %s' % key)
+        except socket.timeout as e:
+            global_lock.acquire()
+            print('!query failure %s' % str(e))
+query_server = threading.Thread(target=run_query, name='query_server')
+query_server.daemon = True
+query_server.start()
 
 session = MC2Session(auth_server) if auth_server else Session()
 session.connect(username, password)
