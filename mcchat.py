@@ -120,7 +120,6 @@ def run_command(cmd):
     except Exception: traceback.print_exc()
     for f in sys.stdout, sys.stderr: f.flush()
 
-@with_global_lock
 def query_map_name():
     global query_map_name_called
     query_map_name_called = True
@@ -131,13 +130,17 @@ query_map_name_called = False
 def run_query():
     global query_map_name_called
     from minecraft_query import MinecraftQuery
+    import socket
     while True:
         global_cond.wait()
         if not query_map_name_called: continue
         query_map_name_called = False
         global_lock.release()
-        status = MinecraftQuery(host, port).get_status()
-        print('!map_name %s' % repr(status))
+        try:
+            status = MinecraftQuery(host, port).get_status()
+            print('!map_name %s' % repr(status))
+        except socket.timeout:
+            print('!failure query_map_name timeout')
         global_lock.acquire()
 query = threading.Thread(target=run_query, name='query')
 query.daemon = True
