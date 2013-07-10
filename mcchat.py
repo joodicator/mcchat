@@ -135,7 +135,7 @@ def run_query():
         if not query_pending: continue
         pending = query_pending.copy()
         query_pending.clear()
-        print('!query pending')
+        for key in pending: print('!query pending %s' % key)
         global_lock.release()
         try:
             status = MinecraftQuery(host, port).get_rules()
@@ -146,10 +146,10 @@ def run_query():
                     if type(val) is list: val = ' '.join(val)
                     print('!query result %s %s' % (key, val))
                 else:
-                    print('!query missing %s' % key)
+                    print('!query failure %s no such key' % key)
         except socket.timeout as e:
             global_lock.acquire()
-            print('!query failure %s' % str(e))
+            for key in pending: print('!query failure %s %s' % (key, str(e)))
 query_server = threading.Thread(target=run_query, name='query_server')
 query_server.daemon = True
 query_server.start()
