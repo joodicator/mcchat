@@ -45,6 +45,7 @@ else:
 auth_server = sys.argv[4] if len(sys.argv) > 4 else None
 
 global_lock = threading.Lock()
+global_cond = threading.Condition(global_lock)
 position_and_look = None
 connection = None
 players = set()
@@ -117,6 +118,29 @@ def run_command(cmd):
     try: exec cmd
     except Exception: traceback.print_exc()
     for f in sys.stdout, sys.stderr: f.flush()
+
+@with_global_lock
+def query_map_name():
+    global query_map_name_called
+    query_map_name_called = True
+    global_cond.notifyAll()        
+query_map_name_called = False
+
+@with_global_lock
+def run_query():
+    global query_map_name_called
+    from minecraft_query import MinecraftQuery
+    while True:
+        global_cond.wait()
+        if not query_map_name_called: continue
+        query_map_name_called = False
+        global_lock.release()
+        status = MinecraftQuery(host, port).get_status()
+        print('!map_name %s' % repr(status))
+        global_lock.acquire()
+query = threading.Thread(target=run_query, name='query')
+query.daemon = True
+query.start()
 
 session = MC2Session(auth_server) if auth_server else Session()
 session.connect(username, password)
