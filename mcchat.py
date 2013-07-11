@@ -71,13 +71,12 @@ class Client(object):
         global connected
         with global_lock:
             connected = True
-        print('Connected to server.')
-        sys.stdout.flush()
+            fprint('Connected to server.')
 
     @staticmethod
     def recv_chat_message(message):
-        print(message.encode('utf8'))
-        sys.stdout.flush()
+        with global_lock:
+            fprint(message.encode('utf8'))
 
     @staticmethod
     def recv_player_position_and_look(**kwds):
@@ -90,17 +89,14 @@ class Client(object):
         with global_lock:
             if connected:
                 connected = False
-                print('Disconnected from server: %s' % reason)
-                sys.stdout.flush()
-                sys.exit()    
+                fprint('Disconnected from server: %s' % reason)
+        sys.exit()    
 
     @staticmethod
     def recv_player_list_item(player_name, online, ping):
         with global_lock:
-            if online:
-                players.add(player_name)
-            else:
-                players.remove(player_name)
+            if online: players.add(player_name)
+            else: players.remove(player_name)
 
 def run_send_position():
     while True:
@@ -111,14 +107,6 @@ def run_send_position():
 send_position = threading.Thread(target=run_send_position, name='send_position')
 send_position.daemon = True
 send_position.start()
-
-
-def list_players():
-    if players:
-        print('Players online: %s.' % ', '.join(players))
-    else:
-        print('No players online.')
-    sys.stdout.flush()
 
 def run_command(cmd):
     try: exec cmd
