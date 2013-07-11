@@ -155,7 +155,7 @@ def run_read_stdin():
     while True:
         msg = raw_input().decode('utf8')
         with global_lock:
-            if msg.startswith('/'):
+            if msg.startswith('?'):
                 run_command(msg[1:])
                 continue
             while len(msg) > 100:
