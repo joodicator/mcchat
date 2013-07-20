@@ -1,14 +1,5 @@
 #!/usr/bin/env python2.7
 
-# Usage: mcchat.py HOST[:PORT] USERNAME PASSWORD [AUTH_SERVER]
-#
-# Joins the Minecraft server given by HOST[:PORT] as USERNAME, and relays
-# chat messages between the game and standard input/output.
-#
-# AUTH_SERVER, if specified, is the hostname of an authentication server
-# running Mineshafter Squared (http://www.mineshaftersquared.com/) or
-# equivalent; otherwise, Minecraft's official authentication server is used.
-
 from __future__ import print_function
 
 import sys
@@ -17,42 +8,27 @@ import os.path
 import threading
 import traceback
 import socket
+import argparse
 
 from McClient.networking.NetworkHelper import NetworkHelper
 from McClient.networking.Connection import Connection
-from McClient.networking.Session import Session
+from McClient.networking.Receiver import BaseReceiver
 from McClient.networking.Receiver import Receiver
 from McClient.networking.Sender import Sender
+from McClient.networking.Exceptions import HandlerError
 from McClient.Events import EventManager
 from McClient import Utils
 
-from minecraft_query import MinecraftQuery
+from McClient.networking.Session import OfflineSession
+from McClient.networking.Session import Session
 from MC2Session import MC2Session
 
-Sender.protocol_version = 61
+from minecraft_query import MinecraftQuery
 
+#==============================================================================#
 DEFAULT_PORT = 25565
 
-if len(sys.argv) not in (4, 5):
-    print('Usage: %s HOST[:PORT] USERNAME PASSWORD [AUTH_SERVER]'
-        % os.path.basename(sys.argv[0]), file=sys.stderr)
-    sys.exit(1)
-
-address, username, password = sys.argv[1:4]
-address = address.rsplit(':', 1)
-if len(address) == 2:
-    host, port = address[0], int(address[1])
-else:
-    host, port = address[0], DEFAULT_PORT
-auth_server = sys.argv[4] if len(sys.argv) > 4 else None
-
-global_lock = threading.Lock()
-global_cond = threading.Condition(global_lock)
-position_and_look = None
-connection = None
-players = set()
-connected = False
-
+#==============================================================================#
 def with_global_lock(func):
     def decorated(*args, **kwds):
         with global_lock: func(*args, **kwds)
@@ -65,6 +41,62 @@ def fprint(*args, **kwds):
     print(*args, **kwds)
     kwds.get('file', sys.stdout).flush()
 
+def eprint(*args, **kwds):
+    fprint(*args, file=sys.stderr, **kwds)
+
+def run_command(cmd):
+    try: exec cmd
+    except Exception: traceback.print_exc()
+    for f in sys.stdout, sys.stderr: f.flush()
+
+query_pending = set()
+def query(key):
+    query_pending.add(str(key))
+    global_cond.notifyAll()        
+
+#==============================================================================#
+arg_parser = argparse.ArgumentParser()
+
+arg_parser.add_argument(
+    'address', metavar='host[:port]',
+    help='The Minecraft server to connect to.')
+
+arg_parser.add_argument(
+    'username',
+    help='Username to connect as.')
+
+arg_parser.add_argument(
+    'password', nargs='?',
+    help='Password to authenticate with, if any.')
+
+arg_parser.add_argument(
+    'auth_server', nargs='?',
+    help='A custom (Mineshafter Squared) authentication server.')
+
+arg_parser.add_argument(
+    '--protocol', metavar='VERSION', type=int,
+    help='The protocol version to report to the Minecraft server.')
+
+args = arg_parser.parse_args()
+
+#==============================================================================#
+address = args.address.rsplit(':', 1)
+if len(address) == 2:
+    host, port = address[0], int(address[1])
+else:
+    host, port = address[0], DEFAULT_PORT
+
+global_lock = threading.Lock()
+global_cond = threading.Condition(global_lock)
+position_and_look = None
+connection = None
+players = set()
+connected = False
+
+if args.protocol is not None:
+    Sender.protocol_version = args.protocol
+
+#==============================================================================#
 class Client(object):
     @staticmethod
     def recv_login_request(*args, **kwds):
@@ -87,9 +119,9 @@ class Client(object):
     def recv_client_disconnect(reason):
         global connected
         with global_lock:
-            if connected:
-                connected = False
-                fprint('Disconnected from server: %s' % reason)
+            connected = False
+            fprint('Disconnected from server: %s' % reason,
+                file=sys.stdout if connected else sys.stderr)
         sys.exit()    
 
     @staticmethod
@@ -98,6 +130,7 @@ class Client(object):
             if online: players.add(player_name)
             else: players.remove(player_name)
 
+#==============================================================================#
 def run_send_position():
     while True:
         time.sleep(0.05)
@@ -108,16 +141,7 @@ send_position = threading.Thread(target=run_send_position, name='send_position')
 send_position.daemon = True
 send_position.start()
 
-def run_command(cmd):
-    try: exec cmd
-    except Exception: traceback.print_exc()
-    for f in sys.stdout, sys.stderr: f.flush()
-
-query_pending = set()
-def query(key):
-    query_pending.add(str(key))
-    global_cond.notifyAll()        
-
+#==============================================================================#
 @with_global_lock
 def run_query():
     while True:
@@ -143,14 +167,17 @@ query_server = threading.Thread(target=run_query, name='query_server')
 query_server.daemon = True
 query_server.start()
 
-session = MC2Session(auth_server) if auth_server else Session()
-session.connect(username, password)
+session = (OfflineSession() if args.password is None
+           else Session() if args.auth_server is None
+           else MC2Session(args.auth_server))     
+session.connect(args.username, args.password)
+
 connection = Connection(session, EventManager, Receiver, Sender)
 connection.name = 'connection'
 connection.eventmanager.apply(Client)
 connection.connect(host, port)
 
-
+#==============================================================================#
 def run_read_stdin():
     while True:
         msg = raw_input().decode('utf8')
@@ -166,7 +193,7 @@ read_stdin = threading.Thread(target=run_read_stdin, name='read_stdin')
 read_stdin.daemon = True
 read_stdin.start()
 
-
+#==============================================================================#
 try:
     while connection.is_alive():
         connection.join(0.1)
@@ -174,6 +201,5 @@ except KeyboardInterrupt:
     connection.disconnect()
 
 with global_lock:
-    if connected:
-        print('Disconnected from server.')
-        sys.stdout.flush()
+    if connected: 
+        fprint('Disconnected from server.')
