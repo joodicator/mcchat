@@ -1,6 +1,7 @@
 import json
 import re
 import os.path
+from itertools import *
 
 
 class DecodeError(Exception):
@@ -12,8 +13,7 @@ def load_language(file):
     for line in file:
         try: name, value = line.split('=', 1)
         except ValueError: continue
-        value = re.sub(r'%(\d+)$', r'%(\1)$', value)
-        language[name] = value
+        language[name] = value.strip()
     return language
 
 with open('en_US.lang') as file:
@@ -39,5 +39,6 @@ def decode_struct(data):
 
 def translate(id, params):
     if id not in language: raise DecodeError
-    try: return language[id] % tuple(params)
+    format = re.sub(r'%(\d+)\$', r'%(\1)', language[id])
+    try: return format % {str(i+1):p for (i,p) in izip(count(), params)}
     except TypeError: raise DecodeError
