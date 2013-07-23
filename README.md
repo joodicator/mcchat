@@ -8,7 +8,7 @@ as a language-agnostic modular component of Minecraft chat bots or chat clients.
 Dependencies
 ------------
 
-- https://github.com/dkkline/McClientLib
+- https://github.com/JosephCrowe/McClientLib (possibly: prtc_74 branch)
 - https://pypi.python.org/pypi/EventManager (required by McClientLib)
 - https://pypi.python.org/pypi/PyNBT (required by McClientLib)
 - https://pypi.python.org/pypi/pycrypto (required by McClientLib)

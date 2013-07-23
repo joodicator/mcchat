@@ -1,7 +1,9 @@
 #!/usr/bin/env python2.7
+# coding=utf8
 
 from __future__ import print_function
 
+import re
 import sys
 import time
 import os.path
@@ -18,12 +20,12 @@ from McClient.networking.Sender import Sender
 from McClient.networking.Exceptions import HandlerError
 from McClient.Events import EventManager
 from McClient import Utils
-
 from McClient.networking.Session import OfflineSession
 from McClient.networking.Session import Session
-from MC2Session import MC2Session
 
+from MC2Session import MC2Session
 from minecraft_query import MinecraftQuery
+import JSONChat
 
 #==============================================================================#
 DEFAULT_PORT = 25565
@@ -58,19 +60,19 @@ def query(key):
 arg_parser = argparse.ArgumentParser()
 
 arg_parser.add_argument(
-    'address', metavar='host[:port]',
+    'address', metavar='HOST[:PORT]',
     help='The Minecraft server to connect to.')
 
 arg_parser.add_argument(
-    'username',
+    'username', metavar='USERNAME',
     help='Username to connect as.')
 
 arg_parser.add_argument(
-    'password', nargs='?',
+    'password', metavar='PASSWORD', nargs='?',
     help='Password to authenticate with, if any.')
 
 arg_parser.add_argument(
-    'auth_server', nargs='?',
+    'auth_server', metavar='AUTH_SERVER|offline', nargs='?',
     help='A custom (Mineshafter Squared) authentication server.')
 
 arg_parser.add_argument(
@@ -93,8 +95,7 @@ connection = None
 players = set()
 connected = False
 
-if args.protocol is not None:
-    Sender.protocol_version = args.protocol
+protocol = Sender.protocol_version = args.protocol or Sender.protocol_version
 
 #==============================================================================#
 class Client(object):
@@ -107,8 +108,20 @@ class Client(object):
 
     @staticmethod
     def recv_chat_message(message):
-        with global_lock:
-            fprint(message.encode('utf8'))
+        if protocol >= 72:
+            message = JSONChat.decode_string(message)
+
+        # Support Bukkit's xAuth plugin.
+        if args.password and message.startswith(u'§c'):
+            for cmd in u'/register', u'/login':
+                if cmd not in message: continue
+                with global_lock: connection.sender.send_chat_message(
+                    '%s %s' % (cmd, args.password))
+
+        message = re.sub(ur'^§[ac]', '! ', message)
+        message = re.sub(ur'§.', '', message)
+
+        with global_lock: fprint(message)
 
     @staticmethod
     def recv_player_position_and_look(**kwds):
@@ -167,9 +180,12 @@ query_server = threading.Thread(target=run_query, name='query_server')
 query_server.daemon = True
 query_server.start()
 
-session = (OfflineSession() if args.password is None
-           else Session() if args.auth_server is None
-           else MC2Session(args.auth_server))     
+if args.auth_server == 'offline' or args.password is None:
+    session = OfflineSession()
+elif args.auth_server is None:
+    session = Session()
+else:
+    session = MC2Session(args.auth_server)
 session.connect(args.username, args.password)
 
 connection = Connection(session, EventManager, Receiver, Sender)
