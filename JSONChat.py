@@ -16,7 +16,7 @@ def load_language(file):
         language[name] = value.strip()
     return language
 
-with open('en_US.lang') as file:
+with open(os.path.join(os.path.dirname(__file__), './en_US.lang')) as file:
     language = load_language(file)
 
 
