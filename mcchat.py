@@ -51,11 +51,6 @@ def run_command(cmd):
     except Exception: traceback.print_exc()
     for f in sys.stdout, sys.stderr: f.flush()
 
-query_pending = set()
-def query(key):
-    query_pending.add(str(key))
-    global_cond.notifyAll()        
-
 #==============================================================================#
 arg_parser = argparse.ArgumentParser()
 
@@ -132,9 +127,9 @@ class Client(object):
     def recv_client_disconnect(reason):
         global connected
         with global_lock:
-            connected = False
             fprint('Disconnected from server: %s' % reason,
                 file=sys.stdout if connected else sys.stderr)
+            connected = False
         sys.exit()    
 
     @staticmethod
@@ -155,6 +150,14 @@ send_position.daemon = True
 send_position.start()
 
 #==============================================================================#
+query_pending = set()
+def query(key):
+    if key == 'players' and connected:
+        fprint('!query success players %s' % ' '.join(players))
+    else:
+        query_pending.add(str(key))
+        global_cond.notifyAll()        
+
 @with_global_lock
 def run_query():
     while True:

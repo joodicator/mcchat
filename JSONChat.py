@@ -1,6 +1,7 @@
 import json
 import re
 import os.path
+import traceback
 from itertools import *
 
 
@@ -21,8 +22,11 @@ with open(os.path.join(os.path.dirname(__file__), './en_US.lang')) as file:
 
 
 def decode_string(data):
-    try: return decode_struct(json.loads(data))
-    except DecodeError: return data
+    try:
+        return decode_struct(json.loads(data))
+    except DecodeError:
+        traceback.print_exc()
+        return data
 
 def decode_struct(data):
     if type(data) is str or type(data) is unicode:
@@ -39,6 +43,14 @@ def decode_struct(data):
 
 def translate(id, params):
     if id not in language: raise DecodeError
-    format = re.sub(r'%(\d+)\$', r'%(\1)', language[id])
-    try: return format % {str(i+1):p for (i,p) in izip(count(), params)}
-    except TypeError: raise DecodeError
+
+    index = count(1)
+    repl = lambda m: '%%(%s)' % (m.group('index') or index.next())
+    format = re.sub(r'%((?P<index>\d+)\$)?', repl, language[id])
+
+    try:
+        args = {str(i+1):p for (i,p) in izip(count(), params)}
+        return format % args
+    except TypeError:
+        traceback.print_exc()
+        raise DecodeError
